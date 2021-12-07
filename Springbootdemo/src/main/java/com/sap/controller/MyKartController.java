@@ -1,10 +1,12 @@
-
-	package com.sap.controller;
+package com.sap.controller;
 
 	import java.io.IOException;
 	import java.util.List;
 
-	import org.springframework.beans.factory.annotation.Autowired;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
+
+import org.springframework.beans.factory.annotation.Autowired;
 	import org.springframework.stereotype.Controller;
 	import org.springframework.ui.Model;
 	import org.springframework.web.bind.annotation.ModelAttribute;
@@ -36,12 +38,13 @@
 		}
 		
 		@RequestMapping("validate")
-		public String validateUser(@ModelAttribute("user") MyKart user,  Model mv) {
+		public String validateUser(@ModelAttribute("user") MyKart user,  Model mv,HttpSession session) {
 			
 			MyKart user1 = userDao.validateUser(user);
 			if(user1!=null) {
-				msg = "Login Successfull";
-				System.out.println("Login Successfull");
+				msg = "";
+				session.setAttribute("access",user.getEmailId());
+				//System.out.println("Login Successfull");
 				return "redirect:/getall";
 			}else {
 				System.out.println("Login Failed");
@@ -71,48 +74,96 @@
 		}
 		
 		@RequestMapping("getall")
-		public ModelAndView getAllUser(ModelAndView mv) {
+		public ModelAndView getAllUser(ModelAndView mv,HttpServletRequest request) {
+			HttpSession session=request.getSession();
+			String sess=(String)session.getAttribute("access");
+			if(sess!=null) {
 			List<MyKart> userList = userDao.getAllUser();
 			mv.addObject("users", userList);
 			mv.addObject("msg", msg);
 			mv.setViewName("viewusers");
 			return mv;
+		}else {
+			msg="Session Closed.Login Again";
+			mv.addObject("msg",msg);
+			mv.setViewName("redirect:/home");
+			return mv;
+		}
 		}
 		
-		@RequestMapping("getuserform")
-		public String getUserForm() {
-			return "getuser";
-		}
+		//@RequestMapping("getuserform")
+		//public String getUserForm() {
+		//	return "getuser";
+		//}
 		
-		@RequestMapping("getbyid")
-		public ModelAndView getById(@RequestParam("id") int id, ModelAndView mv) {
+		@RequestMapping("getbyid/{id}")
+		public ModelAndView getById(@PathVariable int id, ModelAndView mv,HttpServletRequest request) {
+			HttpSession session=request.getSession();
+			String sess=(String)session.getAttribute("access");
+			if(sess!=null) {
 			MyKart user = userDao.getUserById(id);
 			mv.addObject("user", user);
 			mv.setViewName("showuser");
 			return mv;
+		}else {
+			mv.setViewName("redirect:/home");
+			return mv;
+		}
 		}
 		
 		@RequestMapping("updateuser/{id}")
-		public String getUpdateUser(@PathVariable int id, Model m) {
-			
-			MyKart user = userDao.getUserById(id);
-			System.out.println("In Controller : "+user);
-			m.addAttribute("user", user);
-			return "updateform";
-			
+		public String getUpdateUser(@PathVariable int id, Model m,HttpServletRequest request) {
+			HttpSession session=request.getSession();
+			String sess=(String)session.getAttribute("access");
+			if(sess!=null) {
+				MyKart user=userDao.getUserById(id);
+				System.out.println("In Controller:"+user);
+				m.addAttribute("user",user);
+				return "updateform";
+				
+			}else {
+				return "redirect:/home";
+			}
 		}
 		
 		@RequestMapping("saveupdate")
-		public String saveUpdate(@ModelAttribute("user") MyKart user) {
-			userDao.updateUser(user);
-			return "redirect:/getall";
-			
+		public ModelAndView saveUpdate(@ModelAttribute("user") MyKart user, ModelAndView mv, @RequestParam("pic") MultipartFile file) throws IOException {
+
+		System.out.println("In Save User");
+		byte[] userPic = file.getBytes();
+
+		user.setUserPic(userPic);
+		userDao.addUser(user);
+		mv.addObject("msg", "User Updated Successfully");
+		//mv.addObject("user", user);
+		mv.setViewName("redirect:/getall");
+		return mv;
+		}
+
+
+
+
+		@RequestMapping("deleteuser/{id}")
+		public String deleteUser(@PathVariable int id,HttpSession session) {
+
+		String sess = (String)session.getAttribute("access");
+		if(sess!=null) {
+		userDao.deleteUser(id);
+		return "redirect:/getall";
+		}else {
+		return "redirect:/home";
+		}
+
 		}
 		
-		@RequestMapping("deleteuser/{id}")
-		public String deleteUser(@PathVariable int id) {
-			userDao.deleteUser(id);
-			return "redirect:/getall";
+		@RequestMapping("logout")
+		public String destroySession(HttpServletRequest request) {
+		request.getSession().invalidate();
+		return "redirect:/home";
 		}
+
+
+
+
 	}
 
